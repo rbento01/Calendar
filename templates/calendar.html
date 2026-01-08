@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Calendar</title>
+
+    <!-- FullCalendar 5.11.3 CSS & JS -->
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+
+</head>
+
+<body>
+    <h1>My Calendar</h1>
+    <p>Logged in as: {{ user.username }} (Role: {{ user.role }})</p>
+    <p>
+        <a href="{{ url_for('add_event') }}"><button>Add New Event</button></a>
+        {% if user.role == 'admin' %}
+            | <a href="{{ url_for('pending_vacations') }}"><button>Pending Vacation Requests</button></a>
+        {% endif %}
+        |
+        <a href="{{ url_for('logout') }}">Logout</a>
+        
+    </p>
+    <div id='calendar'></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var calendarEl = document.getElementById('calendar');
+
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                events: {{ events | tojson }}
+            });
+
+        calendar.render();
+        });
+    </script>
+
+</body>
+
+</html>

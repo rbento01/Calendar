@@ -1,0 +1,20 @@
+<h1>Add Event</h1>
+<form method="POST">
+    <label>Title:</label><br>
+    <input type="text" name="title" required><br><br>
+
+    <label>Event Type:</label><br>
+    <select name="event_type">
+        <option value="vacation">Vacation</option>
+        <option value="meeting">Meeting</option>
+    </select><br><br>
+
+    <label>Start Date:</label><br>
+    <input type="date" name="start_date" required><br><br>
+
+    <label>End Date:</label><br>
+    <input type="date" name="end_date" required><br><br>
+
+    <button type="submit">Add Event</button>
+</form>
+<p><a href="{{ url_for('calendar') }}">Back to Calendar</a></p>

@@ -1,0 +1,16 @@
+<h1>Pending Vacation Requests</h1>
+
+<ul>
+{% for e in pending %}
+    <li>
+        <strong>{{ e.title }}</strong>
+        ({{ e.start_date }} → {{ e.end_date }})
+        <a href="{{ url_for('approve_event', event_id=e.id) }}">✅ Approve</a>
+        <a href="{{ url_for('reject_event', event_id=e.id) }}">❌ Reject</a>
+    </li>
+{% else %}
+    <li>No pending requests 🎉</li>
+{% endfor %}
+</ul>
+
+<a href="{{ url_for('calendar') }}">Back to calendar</a>
