@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -107,33 +107,46 @@ from datetime import timedelta
 @app.route("/calendar")
 @login_required
 def calendar():
+    pending = []
+
     if current_user.role == "admin":
-        events = Event.query.filter_by(status="approved").all()
+        events = Event.query.all()
+        pending = Event.query.filter_by(
+            event_type="vacation",
+            status="pending"
+        ).all()
     else:
         events = Event.query.filter(
-            Event.status == "approved",
             or_(
-                Event.created_by == current_user.id,  # personal events created by the user
-                (Event.scope == "team") & (Event.team_id == current_user.team_id)  # only their own team
+                Event.created_by == current_user.id,
+                and_(
+                    Event.scope == "team",
+                    Event.team_id == current_user.team_id,
+                    Event.status == "approved"
+                )
             )
         ).all()
 
     event_list = []
     for e in events:
         all_day = (e.event_type == "vacation")
+        status_colors = {
+            "pending": "#facc15",
+            "approved": "#10b981",
+            "rejected": "#ef4444"
+        }
 
         event_list.append({
+            "id": e.id,
             "title": e.title,
-            "start": e.start_datetime.date().isoformat() if all_day else e.start_datetime.isoformat(),
-            "end": (e.end_datetime.date() + timedelta(days=1)).isoformat() if all_day else e.end_datetime.isoformat(),
+            "start": e.start_datetime.isoformat() if not all_day else e.start_datetime.date().isoformat(),
+            "end": e.end_datetime.isoformat() if not all_day else (e.end_datetime.date() + timedelta(days=1)).isoformat(),
             "allDay": all_day,
-            "color": "#10b981" if e.event_type == "vacation" else "#3b82f6"
+            "color": status_colors[e.status],
+            "status": e.status
         })
 
-    return render_template("calendar.html", events=event_list, user=current_user)
-
-
-
+    return render_template("calendar.html", events=event_list, user=current_user, pending=pending)
 
 # Add event page
 from datetime import datetime
@@ -192,34 +205,32 @@ def pending_vacations():
 
     return render_template("pending_vacations.html", pending=pending)
 
-@app.route("/approve_event/<int:event_id>")
+from flask import jsonify
+
+@app.route("/approve_event/<int:event_id>", methods=["POST"])
 @login_required
 def approve_event(event_id):
     if current_user.role != "admin":
-        flash("Access denied", "danger")
-        return redirect(url_for("calendar"))
+        return {"error": "Access denied"}, 403
 
     event = Event.query.get_or_404(event_id)
     event.status = "approved"
     db.session.commit()
-
-    flash("Vacation approved", "success")
-    return redirect(url_for("pending_vacations"))
+    return {"success": True, "status": "approved"}
 
 
-@app.route("/reject_event/<int:event_id>")
+@app.route("/reject_event/<int:event_id>", methods=["POST"])
 @login_required
 def reject_event(event_id):
     if current_user.role != "admin":
-        flash("Access denied", "danger")
-        return redirect(url_for("calendar"))
+        return {"error": "Access denied"}, 403
 
     event = Event.query.get_or_404(event_id)
     event.status = "rejected"
     db.session.commit()
+    return {"success": True, "status": "rejected"}
 
-    flash("Vacation rejected", "info")
-    return redirect(url_for("pending_vacations"))
+
 
 
 # Run app
@@ -266,7 +277,7 @@ with app.app_context():
             team_id=team2.id
         )
 
-    if not User.query.filter_by(username="John").first():
+    if not User.query.filter_by(username="john").first():
         john = User(
             username="john",
             password_hash=generate_password_hash("johnpass"),
