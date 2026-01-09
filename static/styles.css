@@ -1,0 +1,94 @@
+/* General page look */
+body {
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background-color: #f4f6f8;
+    margin: 0;
+    padding: 40px;
+    color: #1f2937;
+}
+
+/* Headings */
+h1 {
+    margin-bottom: 10px;
+}
+
+/* Buttons */
+button {
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #1e40af;
+}
+
+/* Card layout */
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    max-width: 1100px;
+    margin: auto;
+}
+
+/* Links */
+a {
+    text-decoration: none;
+}
+
+/* Base input style for text, password, email, etc. */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="datetime-local"],
+textarea,
+select {
+    width: 340px;               /* full width of container */
+    padding: 10px 14px;        /* inner spacing */
+    margin: 6px 0 16px 0;      /* spacing between fields */
+    border: 1px solid #cbd5e1; /* light gray border */
+    border-radius: 8px;        /* rounded corners */
+    font-size: 16px;
+    font-family: inherit;
+    background-color: #ffffff;
+    box-sizing: border-box;
+    transition: 0.3s all ease;
+}
+
+/* Focus state */
+input:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: #2563eb;    /* blue border on focus */
+    box-shadow: 0 0 5px rgba(37, 99, 235, 0.5);
+}
+
+/* Placeholder text */
+input::placeholder,
+textarea::placeholder {
+    color: #94a3b8;  /* gray placeholder */
+    font-style: italic;
+}
+
+/* Disabled input */
+input:disabled,
+textarea:disabled,
+select:disabled {
+    background-color: #f1f5f9;
+    cursor: not-allowed;
+}
+
+/* Small rounded button for submit */
+button, input[type="submit"] {
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+}

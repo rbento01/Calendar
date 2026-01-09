@@ -103,7 +103,7 @@ def calendar():
             "title": f"{e.title} ({e.event_type})",
             "start": e.start_date.strftime("%Y-%m-%d"),
             "end": (e.end_date + timedelta(days=1)).strftime("%Y-%m-%d"),
-            "color": "green" if e.event_type == "vacation" else "blue"
+            "color": "#10b981" if e.event_type == "vacation" else "#3b82f6"
         })
 
     return render_template("calendar.html", events=event_list, user=current_user)
@@ -202,4 +202,3 @@ if __name__ == "__main__":
 
     # Run app
     app.run(debug=True)
-

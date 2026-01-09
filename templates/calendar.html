@@ -1,35 +1,110 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
+    <meta charset="UTF-8">
     <title>Calendar</title>
 
-    <!-- FullCalendar 5.11.3 CSS & JS -->
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet" />
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+    <!-- FullCalendar -->
+    <!-- <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet"> -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script> -->
 
+    <link rel="stylesheet" href="{{ url_for('static', filename='main.min.css') }}">
+    <script src="{{ url_for('static', filename='main.min.js') }}"></script>
+
+    <link rel="icon" type="image/png" href="./static/favicon.png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
+
+    <!-- Page styling -->
+    <style>
+        body {
+            font-family: "Segoe UI", Roboto, Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 40px;
+            color: #1f2937;
+        }
+
+        .header {
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin-bottom: 4px;
+        }
+
+        .actions {
+            margin-bottom: 25px;
+        }
+
+        .actions a button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        .actions a button:hover {
+            background: #1e40af;
+        }
+
+        .calendar-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+        }
+
+        #calendar {
+            max-width: 1100px;
+            margin: auto;
+        }
+    </style>
 </head>
 
 <body>
-    <h1>My Calendar</h1>
-    <p>Logged in as: {{ user.username }} (Role: {{ user.role }})</p>
-    <p>
-        <a href="{{ url_for('add_event') }}"><button>Add New Event</button></a>
+
+    <div class="header">
+        <h1>📅 Company Calendar</h1>
+        <p>Logged in as <strong>{{ user.username }}</strong> ({{ user.role }})</p>
+    </div>
+
+    <div class="actions">
+        <a href="{{ url_for('add_event') }}"><button>Add Event</button></a>
         {% if user.role == 'admin' %}
-            | <a href="{{ url_for('pending_vacations') }}"><button>Pending Vacation Requests</button></a>
+        <a href="{{ url_for('pending_vacations') }}"><button>Pending Requests</button></a>
         {% endif %}
-        |
-        <a href="{{ url_for('logout') }}">Logout</a>
-        
-    </p>
-    <div id='calendar'></div>
+        <a href="{{ url_for('logout') }}">
+            <button style="background:#6b7280; float: right; background-color: rgb(210, 34, 34);">Logout</button>
+        </a>
+    </div>
+
+    <div class="calendar-card">
+        <div id="calendar"></div>
+    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            var calendarEl = document.getElementById('calendar');
+            var calendar = new FullCalendar.Calendar(
+                document.getElementById('calendar'), {
 
-            var calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
+                height: "auto",
+
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+
+                nowIndicator: true,
+                dayMaxEvents: true,
+                fixedWeekCount: false,
+
                 events: {{ events | tojson }}
             });
 

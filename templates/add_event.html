@@ -1,3 +1,7 @@
+<title>Calendar | Add Event</title>
+<link rel="icon" type="image/png" href="./static/favicon.png">
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
 <h1>Add Event</h1>
 <form method="POST">
     <label>Title:</label><br>
@@ -9,11 +13,12 @@
         <option value="meeting">Meeting</option>
     </select><br><br>
 
-    <label>Start Date:</label><br>
-    <input type="date" name="start_date" required><br><br>
+    <label for="start_date">Start Date:</label><br>
+    <input type="datetime-local" name="start_date" id="start_date" required><br><br>
 
-    <label>End Date:</label><br>
-    <input type="date" name="end_date" required><br><br>
+    <label for="end_date">End Date:</label><br>
+    <input type="datetime-local" name="end_date" id="end_date" required><br><br>
+
 
     <button type="submit">Add Event</button>
 </form>
