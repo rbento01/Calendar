@@ -1,15 +1,45 @@
+import os
+from dotenv import load_dotenv
+
+# --- Load environment variables ---
+load_dotenv()  # loads .env into os.environ
+
 from flask import Flask, render_template, request, redirect, url_for, flash
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import (LoginManager,login_user,logout_user,login_required,current_user)
 from sqlalchemy import and_, or_
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_ldap3_login import LDAP3LoginManager
 
-app = Flask(__name__)
-app.secret_key = "supersecretkey"
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///calendar.db"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# --- Initialize Flask app ---
+app = Flask(
+    __name__,
+    template_folder=os.environ.get("TEMPLATE_FOLDER", "templates"),
+    static_folder=os.environ.get("STATIC_FOLDER", "static")
+)
 
+app.secret_key = os.environ.get("FLASK_SECRET_KEY")
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("SQLALCHEMY_DATABASE_URI")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = os.environ.get("SQLALCHEMY_TRACK_MODIFICATIONS") == "True"
+
+# --- Initialize database ---
 db = SQLAlchemy(app)
+
+# --- Flask-Login setup ---
+login_manager = LoginManager()
+login_manager.login_view = "login"
+login_manager.init_app(app)
+
+# --- LDAP setup ---
+app.config["LDAP_HOST"] = os.environ.get("LDAP_SERVER")
+app.config["LDAP_BASE_DN"] = os.environ.get("LDAP_BASEDN")
+app.config["LDAP_USER_DN"] = "cn=NCS,cn=Users"  # adjust if needed
+app.config["LDAP_BIND_USER_DN"] = os.environ.get("LDAP_BIND_USER")
+app.config["LDAP_BIND_USER_PASSWORD"] = os.environ.get("LDAP_BIND_PASS")
+app.config["LDAP_USER_RDN_ATTR"] = "cn"
+app.config["LDAP_USER_LOGIN_ATTR"] = "cn"
+
+ldap_manager = LDAP3LoginManager(app)
 
 # --- User model ---
 class User(db.Model):
@@ -87,13 +117,36 @@ def login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
-        user = User.query.filter_by(username=username).first()
-        if user and user.check_password(password):
-            login_user(user)
+
+        # Try LDAP authentication
+        try:
+            ldap_user = ldap_manager.authenticate(username, password)
+        except Exception:
+            ldap_user = None
+
+        if ldap_user:
+            local_user = User.query.filter_by(username=username).first()
+            if not local_user:
+                local_user = User(
+                    username=username,
+                    password_hash=generate_password_hash(""),  # LDAP handles password
+                    role="user"
+                )
+                db.session.add(local_user)
+                db.session.commit()
+            login_user(local_user)
+            flash("Logged in via LDAP!", "success")
+            return redirect(url_for("calendar"))
+
+        # Fallback to local DB
+        local_user = User.query.filter_by(username=username).first()
+        if local_user and local_user.check_password(password):
+            login_user(local_user)
             flash("Logged in successfully!", "success")
             return redirect(url_for("calendar"))
-        else:
-            flash("Invalid username or password", "danger")
+
+        flash("Invalid username or password", "danger")
+
     return render_template("login.html")
 
 @app.route("/logout")
