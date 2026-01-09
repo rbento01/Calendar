@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import or_
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -16,6 +17,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     role = db.Column(db.String(20), nullable=False, default="user")
+    team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -43,12 +45,22 @@ from datetime import datetime
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
-    event_type = db.Column(db.String(20), nullable=False)  # vacation / meeting
-    start_date = db.Column(db.Date, nullable=False)
-    end_date = db.Column(db.Date, nullable=False)
+    event_type = db.Column(db.String(20), nullable=False)
     status = db.Column(db.String(20), nullable=False, default="approved")
-    created_by = db.Column(db.Integer, db.ForeignKey("user.id"))
 
+    start_datetime = db.Column(db.DateTime, nullable=False)
+    end_datetime = db.Column(db.DateTime, nullable=False)
+
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+
+    scope = db.Column(db.String(20), nullable=False, default="personal")
+    team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)
+
+
+class Team(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), unique=True, nullable=False)
+    users = db.relationship("User", backref="team", lazy=True)
 
 
 # --- Setup Flask-Login ---
@@ -95,31 +107,52 @@ from datetime import timedelta
 @app.route("/calendar")
 @login_required
 def calendar():
-    events = Event.query.filter_by(status="approved").all()
+    if current_user.role == "admin":
+        events = Event.query.filter_by(status="approved").all()
+    else:
+        events = Event.query.filter(
+            Event.status == "approved",
+            or_(
+                Event.created_by == current_user.id,  # personal events created by the user
+                (Event.scope == "team") & (Event.team_id == current_user.team_id)  # only their own team
+            )
+        ).all()
 
     event_list = []
     for e in events:
+        all_day = (e.event_type == "vacation")
+
         event_list.append({
-            "title": f"{e.title} ({e.event_type})",
-            "start": e.start_date.strftime("%Y-%m-%d"),
-            "end": (e.end_date + timedelta(days=1)).strftime("%Y-%m-%d"),
+            "title": e.title,
+            "start": e.start_datetime.date().isoformat() if all_day else e.start_datetime.isoformat(),
+            "end": (e.end_datetime.date() + timedelta(days=1)).isoformat() if all_day else e.end_datetime.isoformat(),
+            "allDay": all_day,
             "color": "#10b981" if e.event_type == "vacation" else "#3b82f6"
         })
 
     return render_template("calendar.html", events=event_list, user=current_user)
 
 
+
+
 # Add event page
+from datetime import datetime
+
 @app.route("/add_event", methods=["GET", "POST"])
 @login_required
 def add_event():
     if request.method == "POST":
         title = request.form["title"]
         event_type = request.form["event_type"]
-        start_date = datetime.strptime(request.form["start_date"], "%Y-%m-%d").date()
-        end_date = datetime.strptime(request.form["end_date"], "%Y-%m-%d").date()
+        scope = request.form["scope"]
 
-        # Status logic
+        start_dt = datetime.strptime(
+            request.form["start_datetime"], "%Y-%m-%dT%H:%M"
+        )
+        end_dt = datetime.strptime(
+            request.form["end_datetime"], "%Y-%m-%dT%H:%M"
+        )
+
         if event_type == "vacation" and current_user.role != "admin":
             status = "pending"
             flash("Vacation request submitted for approval.", "info")
@@ -130,10 +163,12 @@ def add_event():
         new_event = Event(
             title=title,
             event_type=event_type,
-            start_date=start_date,
-            end_date=end_date,
+            start_datetime=start_dt,
+            end_datetime=end_dt,
             status=status,
-            created_by=current_user.id
+            created_by=current_user.id,
+            scope=scope,
+            team_id=current_user.team_id if scope == "team" else None
         )
 
         db.session.add(new_event)
@@ -141,6 +176,7 @@ def add_event():
         return redirect(url_for("calendar"))
 
     return render_template("add_event.html", user=current_user)
+
 
 @app.route("/pending_vacations")
 @login_required
@@ -187,18 +223,62 @@ def reject_event(event_id):
 
 
 # Run app
-if __name__ == "__main__":
-    # Create tables and default users inside app context
-    with app.app_context():
-        db.create_all()  # Creates database tables if they don't exist
+with app.app_context():
+    db.create_all()
 
-        # Create default admin and user (for first run)
-        if not User.query.filter_by(username="admin").first():
-            admin = User(username="admin", password_hash=generate_password_hash("adminpass"), role="admin")
-            user = User(username="alice", password_hash=generate_password_hash("alicepass"), role="user")
-            db.session.add(admin)
-            db.session.add(user)
-            db.session.commit()
+    # Create or get teams
+    team1 = Team.query.filter_by(name="Engineering").first()
+    if not team1:
+        team1 = Team(name="Engineering")
+        db.session.add(team1)
 
-    # Run app
+    team2 = Team.query.filter_by(name="HR").first()
+    if not team2:
+        team2 = Team(name="HR")
+        db.session.add(team2)
+
+    db.session.commit()  # commit teams to get IDs
+
+    # Initialize user variables
+    admin = alice = bob = john = None
+
+    # Create users only if not exist
+    if not User.query.filter_by(username="admin").first():
+        admin = User(
+            username="admin",
+            password_hash=generate_password_hash("adminpass"),
+            role="admin"
+        )
+
+    if not User.query.filter_by(username="alice").first():
+        alice = User(
+            username="alice",
+            password_hash=generate_password_hash("alicepass"),
+            role="user",
+            team_id=team1.id
+        )
+
+    if not User.query.filter_by(username="bob").first():
+        bob = User(
+            username="bob",
+            password_hash=generate_password_hash("bobpass"),
+            role="user",
+            team_id=team2.id
+        )
+
+    if not User.query.filter_by(username="John").first():
+        john = User(
+            username="john",
+            password_hash=generate_password_hash("johnpass"),
+            role="user",
+            team_id=team1.id
+        )
+
+    # Add only users that were created
+    users_to_add = [u for u in [admin, alice, bob, john] if u is not None]
+    if users_to_add:
+        db.session.add_all(users_to_add)
+        db.session.commit()
+
+            
     app.run(debug=True)

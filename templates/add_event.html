@@ -14,10 +14,22 @@
     </select><br><br>
 
     <label for="start_date">Start Date:</label><br>
-    <input type="datetime-local" name="start_date" id="start_date" required><br><br>
+    <input type="datetime-local" name="start_datetime" id="start_date" required><br><br>
 
     <label for="end_date">End Date:</label><br>
-    <input type="datetime-local" name="end_date" id="end_date" required><br><br>
+    <input type="datetime-local" name="end_datetime" id="end_date" required><br><br>
+
+
+    <label>Scope:</label><br>
+    <label>
+        <input type="radio" name="scope" value="personal" checked>
+        Only me
+    </label>
+
+    <label>
+        <input type="radio" name="scope" value="team">
+        Whole team
+    </label><br><br>
 
 
     <button type="submit">Add Event</button>
