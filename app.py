@@ -52,9 +52,11 @@ class Event(db.Model):
     end_datetime = db.Column(db.DateTime, nullable=False)
 
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    creator = db.relationship("User", backref="events")
 
     scope = db.Column(db.String(20), nullable=False, default="personal")
     team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)
+
 
 
 class Team(db.Model):
@@ -143,7 +145,11 @@ def calendar():
             "end": e.end_datetime.isoformat() if not all_day else (e.end_datetime.date() + timedelta(days=1)).isoformat(),
             "allDay": all_day,
             "color": status_colors[e.status],
-            "status": e.status
+            "status": e.status,
+            
+        # user info for better readability
+        "username": e.creator.username,
+        "team": e.creator.team.name if e.creator.team else "No team"
         })
 
     return render_template("calendar.html", events=event_list, user=current_user, pending=pending)

@@ -62,14 +62,29 @@
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
         }
 
+        /* .fc-event.rejected {
+            opacity: 0.5;
+            text-decoration: line-through;
+        } */
+
+        .fc-event.rejected .event-title {
+            text-decoration: line-through;
+        }
+
         .fc-event.rejected {
             opacity: 0.6;
         }
 
-        .fc-event.rejected {
-            opacity: 0.5;
-            text-decoration: line-through;
+        .fc-event-meta {
+            font-size: 0.75rem;
+            opacity: 0.85;
         }
+
+        .fc-event-status {
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
 
         #calendar {
             max-width: 1100px;
@@ -138,8 +153,22 @@
 
             eventContent: function (arg) {
                 return {
-                    html: `<b>${arg.event.title}</b><br>
-                           <small>${arg.event.extendedProps.status.toUpperCase()}</small>`
+                    html: `
+                        <div class="event-title">
+                            <strong>${arg.event.title}</strong>
+                        </div>
+                        <div class="fc-event-meta">
+                            <small>
+                                ${arg.event.extendedProps.username}
+                                (${arg.event.extendedProps.team})
+                            </small>
+                        </div>
+                        <div class="fc-event-status">
+                            <small>
+                                ${arg.event.extendedProps.status.toUpperCase()}
+                            </small>
+                        </div>
+                    `
                 };
             },
 
