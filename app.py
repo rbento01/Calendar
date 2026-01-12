@@ -292,42 +292,63 @@ def reject_event(event_id):
 
 
 
-def init_db():
-    with app.app_context():
-        db.create_all()
+# Run app
+with app.app_context():
+    db.create_all()
 
-        # Teams
-        team1 = Team.query.filter_by(name="Engineering").first()
-        if not team1:
-            team1 = Team(name="Engineering")
-            db.session.add(team1)
+    # Create or get teams
+    team1 = Team.query.filter_by(name="Engineering").first()
+    if not team1:
+        team1 = Team(name="Engineering")
+        db.session.add(team1)
 
-        team2 = Team.query.filter_by(name="HR").first()
-        if not team2:
-            team2 = Team(name="HR")
-            db.session.add(team2)
+    team2 = Team.query.filter_by(name="HR").first()
+    if not team2:
+        team2 = Team(name="HR")
+        db.session.add(team2)
 
+    db.session.commit()  # commit teams to get IDs
+
+    # Initialize user variables
+    admin = alice = bob = john = None
+
+    # Create users only if not exist
+    if not User.query.filter_by(username="admin").first():
+        admin = User(
+            username="admin",
+            password_hash=generate_password_hash("adminpass"),
+            role="admin"
+        )
+
+    if not User.query.filter_by(username="alice").first():
+        alice = User(
+            username="alice",
+            password_hash=generate_password_hash("alicepass"),
+            role="user",
+            team_id=team1.id
+        )
+
+    if not User.query.filter_by(username="bob").first():
+        bob = User(
+            username="bob",
+            password_hash=generate_password_hash("bobpass"),
+            role="user",
+            team_id=team2.id
+        )
+
+    if not User.query.filter_by(username="john").first():
+        john = User(
+            username="john",
+            password_hash=generate_password_hash("johnpass"),
+            role="user",
+            team_id=team1.id
+        )
+
+    # Add only users that were created
+    users_to_add = [u for u in [admin, alice, bob, john] if u is not None]
+    if users_to_add:
+        db.session.add_all(users_to_add)
         db.session.commit()
 
-        # Users
-        def ensure_user(username, password, role, team_id=None):
-            if not User.query.filter_by(username=username).first():
-                user = User(
-                    username=username,
-                    password_hash=generate_password_hash(password),
-                    role=role,
-                    team_id=team_id
-                )
-                db.session.add(user)
-
-        ensure_user("admin", "adminpass", "admin")
-        ensure_user("alice", "alicepass", "user", team1.id)
-        ensure_user("bob", "bobpass", "user", team2.id)
-        ensure_user("john", "johnpass", "user", team1.id)
-
-        db.session.commit()
-
-
-if __name__ == "__main__":
-    init_db()
-    app.run(host="0.0.0.0", port=5000)
+            
+    app.run(debug=True)
