@@ -7,6 +7,7 @@ load_dotenv()  # loads .env into os.environ
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (LoginManager,login_user,logout_user,login_required,current_user)
+from flask_login import UserMixin
 from sqlalchemy import and_, or_
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_ldap3_login import LDAP3LoginManager
@@ -45,11 +46,20 @@ ldap_manager = LDAP3LoginManager(app)
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    
+    # Make nullable so LDAP-only users can be stored
+    password_hash = db.Column(db.String(128), nullable=True)
+    
     role = db.Column(db.String(20), nullable=False, default="user")
     team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True)
 
+    # Flag to mark LDAP users
+    is_ldap = db.Column(db.Boolean, default=False)
+
     def check_password(self, password):
+        """Check local password hash. Returns False if password_hash is empty."""
+        if not self.password_hash:
+            return False
         return check_password_hash(self.password_hash, password)
 
     # Flask-Login properties
@@ -67,6 +77,7 @@ class User(db.Model):
 
     def get_id(self):
         return str(self.id)
+
 
 
 # --- Event model ---
@@ -111,6 +122,10 @@ def home():
         return redirect(url_for("calendar"))
     return redirect(url_for("login"))
 
+
+import time
+
+
 # Login/logout
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -118,35 +133,43 @@ def login():
         username = request.form["username"]
         password = request.form["password"]
 
-        # Try LDAP authentication
+        # --- 1️⃣ Check LOCAL users first (fast) ---
+        local_user = User.query.filter_by(username=username).first()
+        if local_user:
+            if local_user.check_password(password):
+                login_user(local_user)
+                flash("Logged in locally", "success")
+                return redirect(url_for("calendar"))
+            else:
+                flash("Invalid password", "danger")
+                return render_template("login.html")
+
+        # --- 2️⃣ Check LDAP only if local user does NOT exist ---
         try:
             ldap_user = ldap_manager.authenticate(username, password)
         except Exception:
             ldap_user = None
 
         if ldap_user:
-            local_user = User.query.filter_by(username=username).first()
-            if not local_user:
-                local_user = User(
-                    username=username,
-                    password_hash=generate_password_hash(""),  # LDAP handles password
-                    role="user"
-                )
-                db.session.add(local_user)
-                db.session.commit()
-            login_user(local_user)
-            flash("Logged in via LDAP!", "success")
+            # First successful LDAP login → create a local user
+            new_user = User(
+                username=username,
+                password_hash=generate_password_hash(password),
+                role="user",
+                is_ldap=True
+            )
+            db.session.add(new_user)
+            db.session.commit()
+
+            login_user(new_user)
+            flash("Logged in via LDAP (local account created)", "success")
             return redirect(url_for("calendar"))
 
-        # Fallback to local DB
-        local_user = User.query.filter_by(username=username).first()
-        if local_user and local_user.check_password(password):
-            login_user(local_user)
-            flash("Logged in successfully!", "success")
-            return redirect(url_for("calendar"))
+        # --- 3️⃣ Neither local nor LDAP exists ---
+        flash("Account does not exist locally or in LDAP", "danger")
+        return render_template("login.html")
 
-        flash("Invalid username or password", "danger")
-
+    # GET request → just render login page
     return render_template("login.html")
 
 @app.route("/logout")
