@@ -5,21 +5,24 @@
     <meta charset="UTF-8">
     <title>Calendar</title>
 
-    <!-- FullCalendar -->
+    <!-- FullCalendar CSS/JS -->
+    <!-- Using local minified versions instead of CDN -->
     <!-- <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet"> -->
     <!-- <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script> -->
-
     <link rel="stylesheet" href="{{ url_for('static', filename='main.min.css') }}">
     <script src="{{ url_for('static', filename='main.min.js') }}"></script>
 
+    <!-- Bootstrap CSS/JS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap.min.css') }}">
     <script src="{{ url_for('static', filename='bootstrap.bundle.min.js') }}"></script>
 
+    <!-- Favicon -->
     <link rel="icon" type="image/png" href="./static/favicon.png">
+
+    <!-- Custom styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 
-
-    <!-- Page styling -->
+    <!-- Inline page styling -->
     <style>
         body {
             font-family: "Segoe UI", Roboto, Arial, sans-serif;
@@ -41,6 +44,7 @@
             margin-bottom: 25px;
         }
 
+        /* Action buttons (Add Event, Pending Requests, Logout) */
         .actions a button {
             background: #2563eb;
             color: white;
@@ -55,6 +59,7 @@
             background: #1e40af;
         }
 
+        /* Calendar card container */
         .calendar-card {
             background: white;
             padding: 20px;
@@ -62,11 +67,7 @@
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
         }
 
-        /* .fc-event.rejected {
-            opacity: 0.5;
-            text-decoration: line-through;
-        } */
-
+        /* Style for rejected events */
         .fc-event.rejected .event-title {
             text-decoration: line-through;
         }
@@ -75,6 +76,7 @@
             opacity: 0.6;
         }
 
+        /* Event metadata styling */
         .fc-event-meta {
             font-size: 0.75rem;
             opacity: 0.85;
@@ -85,7 +87,7 @@
             font-weight: 600;
         }
 
-
+        /* Calendar container */
         #calendar {
             max-width: 1100px;
             margin: auto;
@@ -95,121 +97,135 @@
 
 <body>
 
+    <!-- Header showing logged-in user info -->
     <div class="header">
         <h1>📅 Company Calendar</h1>
         <p>Logged in as <strong>{{ user.username }}</strong> ({{ user.role }})</p>
     </div>
 
+    <!-- Action buttons -->
     <div class="actions">
+        <!-- Add Event button triggers modal -->
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEventModal">
             Add Event
         </button>
 
+        <!-- Admin-only button for pending requests -->
         {% if user.role == 'admin' %}
         <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#pendingModal">
             Pending Requests
         </button>
         {% endif %}
+
+        <!-- Logout link -->
         <a href="{{ url_for('logout') }}" class="btn btn-danger float-end">Logout</a>
     </div>
 
+    <!-- Calendar container -->
     <div class="calendar-card">
         <div id="calendar"></div>
     </div>
 
+    <!-- --- FullCalendar Initialization --- -->
     <script>
-        let calendar;  // global reference
+        let calendar;  // global reference to FullCalendar instance
 
         document.addEventListener('DOMContentLoaded', function () {
 
             calendar = new FullCalendar.Calendar(
                 document.getElementById('calendar'), {
 
-                initialView: 'dayGridMonth',
+                initialView: 'dayGridMonth', // default view
                 height: "auto",
 
-                headerToolbar: {
+                headerToolbar: { // top toolbar buttons
                     left: 'prev,next today',
                     center: 'title',
                     right: 'dayGridMonth,timeGridWeek,timeGridDay'
                 },
 
-                nowIndicator: true,
-                dayMaxEvents: true,
+                nowIndicator: true, // show current time line
+                dayMaxEvents: true, // limit events per day
                 fixedWeekCount: false,
 
-                // TIME SETTINGS
+                // Time settings for timeGrid views
                 slotMinTime: "06:00:00",
                 slotMaxTime: "22:00:00",
                 slotDuration: "00:30:00",
 
+                // Display time format
                 eventTimeFormat: {
                     hour: '2-digit',
                     minute: '2-digit',
                     hour12: false
                 },
 
+                // Load events passed from Flask
                 events: {{ events | tojson }},
 
-            eventContent: function (arg) {
-                return {
-                    html: `
-                        <div class="event-title">
-                            <strong>${arg.event.title}</strong>
-                        </div>
-                        <div class="fc-event-meta">
-                            <small>
-                                ${arg.event.extendedProps.username}
-                                (${arg.event.extendedProps.team})
-                            </small>
-                        </div>
-                        <div class="fc-event-status">
-                            <small>
-                                ${arg.event.extendedProps.status.toUpperCase()}
-                            </small>
-                        </div>
-                    `
-                };
-            },
+                // Custom rendering of each event
+                eventContent: function (arg) {
+                    return {
+                        html: `
+                            <div class="event-title">
+                                <strong>${arg.event.title}</strong>
+                            </div>
+                            <div class="fc-event-meta">
+                                <small>
+                                    ${arg.event.extendedProps.username}
+                                    (${arg.event.extendedProps.team})
+                                </small>
+                            </div>
+                            <div class="fc-event-status">
+                                <small>
+                                    ${arg.event.extendedProps.status.toUpperCase()}
+                                </small>
+                            </div>
+                        `
+                    };
+                },
 
-            eventClassNames: function (arg) {
-                return [arg.event.extendedProps.status];
-            },
+                // Add status as CSS class for color/styling
+                eventClassNames: function (arg) {
+                    return [arg.event.extendedProps.status];
+                },
 
-            eventDidMount: function (info) {
-                if (info.event.extendedProps.status === 'rejected') {
-                    info.el.style.pointerEvents = 'none';
+                // Make rejected events unclickable
+                eventDidMount: function (info) {
+                    if (info.event.extendedProps.status === 'rejected') {
+                        info.el.style.pointerEvents = 'none';
+                    }
                 }
-            }
+            });
+
+            // Admin-only event click logic
+            calendar.on('eventClick', function (info) {
+                {% if user.role == 'admin' %}
+                if (info.event.extendedProps.status === 'pending') {
+                    window.selectedEventId = info.event.id;
+                    document.getElementById('eventActionTitle').textContent =
+                        `Do you want to approve or reject "${info.event.title}"?`;
+
+                    new bootstrap.Modal(
+                        document.getElementById('eventActionModal')
+                    ).show();
+                }
+                {% endif %}
+            });
+
+            calendar.render();
+
+            // Approve / Reject buttons for modal
+            document.getElementById('approveBtn').addEventListener('click', function () {
+                updateEventStatus('approve');
+            });
+
+            document.getElementById('rejectBtn').addEventListener('click', function () {
+                updateEventStatus('reject');
+            });
         });
 
-        calendar.on('eventClick', function (info) {
-            {% if user.role == 'admin' %}
-            if (info.event.extendedProps.status === 'pending') {
-                window.selectedEventId = info.event.id;
-                document.getElementById('eventActionTitle').textContent =
-                    `Do you want to approve or reject "${info.event.title}"?`;
-
-                new bootstrap.Modal(
-                    document.getElementById('eventActionModal')
-                ).show();
-            }
-            {% endif %}
-        });
-
-        calendar.render();
-
-        document.getElementById('approveBtn').addEventListener('click', function () {
-            updateEventStatus('approve');
-        });
-
-        document.getElementById('rejectBtn').addEventListener('click', function () {
-            updateEventStatus('reject');
-        });
-    });
-
-
-
+        // AJAX request to update event status
         function updateEventStatus(action) {
             fetch(`/${action}_event/${window.selectedEventId}`, {
                 method: 'POST',
@@ -239,31 +255,36 @@
         }
     </script>
 
-    <!-- Add Event Modal -->
+    <!-- --- Add Event Modal --- -->
     <div class="modal fade" id="addEventModal" tabindex="-1" aria-labelledby="addEventModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
+                <!-- Form posts to Flask route /add_event -->
                 <form id="addEventForm" method="POST" action="{{ url_for('add_event') }}">
                     <div class="modal-header">
                         <h5 class="modal-title" id="addEventModalLabel">Add Event</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
+                        <!-- Event title input -->
                         <label>Title:</label>
                         <input type="text" name="title" class="form-control" required>
 
+                        <!-- Event type selector -->
                         <label class="mt-2">Event Type:</label>
                         <select name="event_type" class="form-select">
                             <option value="vacation">Vacation</option>
                             <option value="meeting">Meeting</option>
                         </select>
 
+                        <!-- Start & End datetime -->
                         <label class="mt-2">Start Date:</label>
                         <input type="datetime-local" name="start_datetime" class="form-control" required>
 
                         <label class="mt-2">End Date:</label>
                         <input type="datetime-local" name="end_datetime" class="form-control" required>
 
+                        <!-- Scope (personal/team) -->
                         <label class="mt-2">Scope:</label>
                         <div>
                             <label><input type="radio" name="scope" value="personal" checked> Only me</label>
@@ -279,7 +300,7 @@
         </div>
     </div>
 
-    <!-- Modal -->
+    <!-- --- Pending Vacations Modal (Admin only) --- -->
     <div class="modal fade" id="pendingModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -293,10 +314,8 @@
                         <li>
                             <strong>{{ e.title }}</strong>
                             ({{ e.start_datetime.date() }} → {{ e.end_datetime.date() }})
-                            <a href="{{ url_for('approve_event', event_id=e.id) }}" class="btn btn-success btn-sm">✅
-                                Approve</a>
-                            <a href="{{ url_for('reject_event', event_id=e.id) }}" class="btn btn-danger btn-sm">❌
-                                Reject</a>
+                            <a href="{{ url_for('approve_event', event_id=e.id) }}" class="btn btn-success btn-sm">✅ Approve</a>
+                            <a href="{{ url_for('reject_event', event_id=e.id) }}" class="btn btn-danger btn-sm">❌ Reject</a>
                         </li>
                         {% else %}
                         <li>No pending requests 🎉</li>
@@ -307,7 +326,7 @@
         </div>
     </div>
 
-    <!-- Approve/Reject Modal -->
+    <!-- --- Approve/Reject Event Modal --- -->
     <div class="modal fade" id="eventActionModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -316,6 +335,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <!-- Title dynamically updated on event click -->
                     <p id="eventActionTitle"></p>
                     <div class="d-flex justify-content-around mt-3">
                         <button id="approveBtn" class="btn btn-success">✅ Approve</button>
