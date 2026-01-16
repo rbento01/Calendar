@@ -205,6 +205,24 @@ newgrp docker
 
 ---
 
+### Sync app code from main
+
+To update only the app code from the `main` branch into your current branch:
+
+```bash
+git checkout Calendar-Ubuntu
+git fetch origin
+git checkout origin/main -- app.py templates static
+git commit -m "Sync app code from main"
+```
+
+**If you want to push the updated code to GitHub, run:**
+```bash
+git push origin Calendar-Ubuntu
+```
+
+---
+
 ## 🎉 Done!
 
 Your Calendar application should now be running in Docker on Ubuntu.
